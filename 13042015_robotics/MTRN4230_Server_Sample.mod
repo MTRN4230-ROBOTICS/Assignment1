@@ -1,5 +1,9 @@
 MODULE MTRN4230_Server_Sample    
-	
+    
+   ! author: Ziwei Guo, Zicong He 
+   ! late update: 20/04/2015
+   !
+   
     ! The socket connected to the client.
     VAR socketdev client_socket;
     
@@ -12,9 +16,13 @@ MODULE MTRN4230_Server_Sample
     VAR string feedback;
     VAR num refresh:=1;
     
+    PERS num timeCount := 99;
+    
     VAR num try:=1;
     VAR string tryStr;
     
+    VAR string lastCommand;
+    VAR string storeLast;
     
     ! define work object and tool
     PERS wobjdata wTable;
@@ -22,25 +30,50 @@ MODULE MTRN4230_Server_Sample
     PERS tooldata tSCup;
     PERS bool startsync := TRUE;
    
-    PROC MainServer() 
+    PROC main() 
             startsync := TRUE;
             
             IF refresh = 1 THEN 
                 ListenForAndAcceptConnection;
-                refresh := 0 ;                
+                refresh := 0 ;   
                 SocketSend client_socket \Str:=("000000000000000000000000000099\0A");
+                checkRetry;
             ENDIF
-            
-            TPWrite received_str;
-            TPWrite "got";
+           
+            !TPWrite received_str;
+            !TPWrite "Still trying to connect";
             ! Receive a string from the client.
-            SocketReceive client_socket \Str:=received_str;
+            SocketReceive client_socket \Str:=received_str, \Time:= 10;
+            !,\Time:=WAIT_MAX;
             
             !-----
             IF checkStatus(received_str) < 90 THEN
-                
-                share := received_str;
+                ! check pause
+               IF checkStatus(received_str) = 9 THEN
+                   
+                   lastCommand := storeLast;        
+                   StopMove; 
+                   
+               ENDIF
+               
+               ! check restart
+               IF checkStatus(received_str) = 10 OR checkStatus(received_str) = 20 THEN
+                   StartMove;
+                   share := lastCommand;
+               ENDIF
+               
+               share := received_str;
                feedback :=readPose() + "99";
+               
+               ! store last command
+               IF checkStatus(received_str) < 9 OR checkStatus(received_str) > 10 THEN
+                   storeLast:= share;
+               ENDIF
+               
+               IF checkStatus(received_str) = 20 THEN
+                   checkRetry;
+               ENDIF
+                             
                 ! Send the string back to the client, adding a line feed character.
                 SocketSend client_socket \Str:=(feedback+"\0A");
             ELSE     
@@ -48,15 +81,18 @@ MODULE MTRN4230_Server_Sample
             ENDIF
             ! check conveyor status
             checkConStat;
+            ERROR 
+                SocketClose client_socket;
+                ListenForAndAcceptConnection;
+                RETRY;
             
-            !try:= try +1;
-            !tryStr := NumToStr(try,0);
-            !SocketSend client_socket \Str:=(tryStr + "\0A");
-            
-            !CloseConnection;           
-            
+
+                       
     ENDPROC
 
+    
+    !Listen and accept matlab connection 
+    ! relative to a frame, input: x, y, z point and speed
     PROC ListenForAndAcceptConnection()
         
         ! Create the socket to listen for a connection on.
@@ -70,11 +106,15 @@ MODULE MTRN4230_Server_Sample
         SocketListen welcome_socket;
         
         ! Accept a connection on the host and port.
-        SocketAccept welcome_socket, client_socket;
+        SocketAccept welcome_socket, client_socket, \Time:=WAIT_MAX;
+        !SocketAccept welcome_socket, client_socket;
         
         ! Close the welcome socket, as it is no longer needed.
         SocketClose welcome_socket;
         
+        ERROR
+            TPWrite "Succeed to retry";
+            RETRY;
     ENDPROC
     
     ! Close the connection to the client.
@@ -83,39 +123,53 @@ MODULE MTRN4230_Server_Sample
     ENDPROC
     
     
-    ! Set ConRun to 0 if ConStat is set to 0
-    PROC checkConStat()
     
-        IF DI10_1 = 0 THEN
-            SetDO DO10_3, 0;
-            TPWrite " ConRun is set to 0 ";
-        ENDIF
-        
-    ENDPROC
-    
-    ! check pose
-    FUNC string readPose()
+   !check position and joint angles, return as string "joint + zyx"
+   FUNC string readPose()
   
         VAR string currentPoseStrX;
         VAR string currentPoseStrY;
         VAR string currentPoseStrZ;
         VAR string currentPoseStr;
-        VAR pos currentPose; 
+        VAR string currentJointStr1;
+        VAR string currentJointStr2;
+        VAR string currentJointStr3;
+        VAR string currentJointStr4;
+        VAR string currentJointStr5;
+        VAR string currentJointStr6;
+        VAR pos currentPosition;  ! only contain x,y,z
+        VAR jointtarget currentAngle; 
         
-        currentPose := CPos(\Tool:= tSCup);
+                   
+        currentPosition := CPos(\Tool:= tSCup);
         !\WObj:= wTable
-        currentPoseStrX := NumToStr (currentPose.x + 5000,0);
-        currentPoseStrY := NumToStr (currentPose.y + 5000,0);
-        currentPoseStrZ := NumToStr (currentPose.z + 5000,0);
+        currentPoseStrX := NumToStr (currentPosition.x + 5000,0);
+        currentPoseStrY := NumToStr (currentPosition.y + 5000,0);
+        currentPoseStrZ := NumToStr (currentPosition.z + 5000,0);
+        
+        ! joint angle feedback
+        currentAngle := CJointT();         
+        currentJointStr1 := NumToStr(currentAngle.robax.rax_1/4 +50, 0) ;
+        currentJointStr2 := NumToStr(currentAngle.robax.rax_2/4 +50, 0) ;
+        currentJointStr3 := NumToStr(currentAngle.robax.rax_3/4 +50, 0) ;
+        currentJointStr4 := NumToStr(currentAngle.robax.rax_4/4 +50, 0) ;
+        currentJointStr5 := NumToStr(currentAngle.robax.rax_5/4 +50, 0) ;
+        currentJointStr6 := NumToStr(currentAngle.robax.rax_6/4 +50, 0) ;
+        !currentJointStr1 := NumToStr(currentAngle.robax.rax_1, 0) ;
+        !TPWrite ("Axis1 is " + currentJointStr1);
+        !current.robax.rax_1 
+        !current.robax.rax_1 
+        !current.robax.rax_1 
+        
         
         ! make it up to the four bits format
-        currentPoseStr := "0000000000000000" + currentPoseStrZ + currentPoseStrY + currentPoseStrX;
-        
+        currentPoseStr :=  currentJointStr6 + currentJointStr5 + currentJointStr4 + currentJointStr3 + currentJointStr2 + currentJointStr1 + currentPoseStrZ + currentPoseStrY + currentPoseStrX + "0000";
         RETURN currentPoseStr;
         
     ENDFUNC
 
-    ! for returning 4 bits string ( read pose )
+    ! for returning 4 bits string (only for read pose function)
+    ! Input: string with less than 4 bytes
     FUNC string fourBit(string value)
         VAR num bitNum;
         
@@ -138,18 +192,43 @@ MODULE MTRN4230_Server_Sample
         
     ENDFUNC
     
-    ! check last 2 bits(command bits)
+    !Return last 2 digits in the string in int format
+    !Input: string value
     FUNC num checkStatus(string value)
         VAR num status;
         VAR bool ok;
         
         value := strPart(value,29,2);
         ok := StrToVal(value, status);
-        TPWrite value;
         
         RETURN status;
         
     ENDFUNC
-      
+  
+    ! Set ConRun to 0 if ConStat is set to 0
+    PROC checkConStat()
     
+        IF DI10_1 = 0 THEN
+            SetDO DO10_3, 0;
+            TPWrite " ConRun is set to 0 ";
+        ENDIF
+        
+    ENDPROC
+    
+    !Restart program
+    !no input needed
+    PROC checkRetry()
+           
+                   TPWrite "In the loop";
+            ERROR
+            IF ERRNO = ERR_SOCK_TIMEOUT THEN
+                
+                   TPWrite "Retry~~~~~~~~~~~~!!!!!!!!!!!!";
+                 RETRY;
+            ELSE
+                TPWrite "Wrong data type";
+            ENDIF
+                 
+    ENDPROC
+ 
 ENDMODULE
