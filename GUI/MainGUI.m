@@ -5,7 +5,7 @@ function varargout = MainGUI(varargin)
 %
 %      H = MAINGUI returns the handle to a new MAINGUI or the handle to
 %      the existing singleton*.
-%
+%qweqweqweqweqweqweeeeeeeeeeeeeeeeeeewwwwwwwwwwwwwwwww
 %      MAINGUI('CALLBACK',hObject,eventData,handles,...) calls the local
 %      function named CALLBACK in MAINGUI.M with the given input arguments.
 %
@@ -24,6 +24,28 @@ function varargout = MainGUI(varargin)
 
 % Last Modified by GUIDE v2.5 13-Apr-2015 21:24:46
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%。。。。。。%。。。。。。。%
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
