@@ -615,23 +615,6 @@ else
     set(handles.Right,'enable','on');
 end
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 end
 
 
@@ -643,9 +626,3 @@ function StopTimer_Callback(hObject, eventdata, handles)
 stop(handles.t);
 
 end
-
-
-
-
-
-%%%% solve the timer error
