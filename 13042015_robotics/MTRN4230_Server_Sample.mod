@@ -16,6 +16,9 @@ MODULE MTRN4230_Server_Sample
     VAR string feedback;
     VAR num refresh:=1;
     
+    VAR num retrycount := 0; 
+    VAR string retrycountStr;
+    
     PERS num timeCount := 99;
     
     VAR num try:=1;
@@ -84,6 +87,11 @@ MODULE MTRN4230_Server_Sample
             ERROR 
                 SocketClose client_socket;
                 ListenForAndAcceptConnection;
+                SocketSend client_socket \Str:=("000000000000000000000000000099\0A");
+                ResetRetryCount;
+                retrycount := retrycount + 1;
+                retrycountStr := NumToStr(retrycount,0);
+                TPWrite retrycountStr; 
                 RETRY;
             
 
