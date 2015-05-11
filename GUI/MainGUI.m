@@ -5,19 +5,7 @@ function varargout = MainGUI(varargin)
 %
 %      H = MAINGUI returns the handle to a new MAINGUI or the handle to
 %      the existing singleton*.
-%qweqweqweqweqweqweeeeeeeeeeeeeeeeeeewwwwwwwwwwwwwwwww
-
-
-
-
-
-
-
-%%%%%%%%%%
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
 %      MAINGUI('CALLBACK',hObject,eventData,handles,...) calls the local
 %      function named CALLBACK in MAINGUI.M with the given input arguments.
 %
@@ -34,30 +22,8 @@ function varargout = MainGUI(varargin)
 
 % Edit the above text to modify the response to help MainGUI
 
-% Last Modified by GUIDE v2.5 13-Apr-2015 21:24:46
+% Last Modified by GUIDE v2.5 20-Apr-2015 18:34:58
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-%。。。。。。%。。。。。。。%
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
@@ -90,18 +56,98 @@ function MainGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.output = hObject;
 handles.t= timer(...
     'ExecutionMode', 'fixedRate', ...   % Run timer repeatedly
-    'Period', 0.1, ...                % Initial period is 1 sec.
+    'Period', 0.06, ...                % Initial period is 1 sec.
     'TimerFcn', @timer_Callback); % Specify callback
-% t = timer('TimerFcn',@timer_Callback,'StartDelay',5);
+
+global robot_IP_address; global robot_port; global socket; global buffer;global commandFlag;
+robot_IP_address = '127.0.0.1';
+robot_port = 7027;
+socket = tcpip(robot_IP_address, robot_port);
+buffer = [];
+commandFlag.stat = 0;
+set(socket, 'ReadAsyncMode', 'continuous'); 
+% 
+if(~isequal(get(socket, 'Status'), 'open'))
+    fopen(socket); 
+end
 % Update handles structure
 guidata(hObject, handles);
-% start(timer);
 start(handles.t);
 
 end
 
+
+
+
+
 function timer_Callback(obj,event)
-disp('coming to tyree,Ben and Raymond he ti la');
+global robot_IP_address; global robot_port; global socket;global commandFlag; global buffer;
+global databuffer;global tableUpdate;
+    if isempty(buffer)
+        buffer = '500050005000500050005000010000';
+    end
+
+    %   Check if the connection is valid.
+    if(~isequal(get(socket, 'Status'), 'open'))
+        warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
+    else
+    
+        % Read a line from the socket. Note the line feed appended to the message in the RADID sample code.
+%         try
+            data = fgetl(socket); %disp(data);
+            if isempty(data)
+                data = '000000000000000000000000000099';
+                disp('nodata flow');
+            end
+            %         
+%catch 
+%             warning(['No data flow']);
+%         end
+        databuffer = data; lastBits = str2double(databuffer(29:30));
+        dataNum = str2num(data);
+%         lastBits = rem(dataNum,100);    
+%         disp(lastBits);
+        if lastBits > 90     
+
+            dataNum = (dataNum - lastBits) / 100;
+            Xpos = rem(dataNum, 10000)-5000;
+
+            dataNum = (dataNum - Xpos)/10000;
+            Ypos = rem(dataNum, 10000)-5000;
+
+            dataNum = (dataNum - Ypos)/10000;
+            Zpos = rem(dataNum, 10000)-5000;
+
+            % Send feedback to the server on the robot.
+%             disp(commandFlag.stat);
+            if commandFlag.stat;                
+                command = commandFlag.m;
+            else
+                command = buffer; 
+            end
+                disp(command);fwrite(socket, command);  
+                
+
+        else
+             fwrite(socket, data);
+        end
+%         buffer = commandFlag.m;
+%         pause(0.1);
+    end
+    if ~isempty(databuffer)
+        loBuf_X = str2num(databuffer((21+1):24));
+        loBuf_Y = str2num(databuffer((17+1):20));loBuf_Z = str2num(databuffer((13+1):16));
+        loBuf_J1 = str2num(databuffer(11:12));loBuf_J2 = str2num(databuffer(9:10));
+        loBuf_J3 = str2num(databuffer(7:8));loBuf_J4 = str2num(databuffer(5:6));
+        loBuf_J5 = str2num(databuffer(3:4));loBuf_J6 = str2num(databuffer(1:2));
+        tableUpdate = [4*(loBuf_J6-50),4*(loBuf_J5-50),4*(loBuf_J4-50),4*(loBuf_J3-50),4*(loBuf_J2-50),4*(loBuf_J1-50),loBuf_Z,loBuf_Y,loBuf_X];
+    else
+        tableUpdate = [0,0,0,0,0,0,0,0,0,0,0,0;0,0,0,0,0,0,0,0,0,0,0,0];
+    end
+    
+    %     disp(tableUpdate);
+%         disp(commandFlag.m);
+% commandFlag.CD,commandFlag.Vac,commandFlag.speed,
 
 end
 
@@ -122,9 +168,20 @@ function varargout = MainGUI_OutputFcn(hObject, eventdata, handles)
 
 % Get default command line output from handles structure
 varargout{1} = handles.output;
-data = [0,0,0,0,0];
+global buffer;global databuffer;
+data = [0,0,0,0,0,0,0,0,0,0,0,0;0,0,0,0,0,0,0,0,0,0,0,0];
 set(handles.uitable3,'data',data);
-
+data = [0,0,100,0,0,0,0,0,0,0,0,0;0,0,0,50,50,50,50,50,50,0,0,0];
+set(handles.uitable3,'data',data);
+if ~isempty(buffer)&&~isempty(databuffer)
+    loBuf_X = str2num(databuffer((21+1):24));
+    loBuf_Y = str2num(databuffer((17+1):20));loBuf_Z = str2num(databuffer((13+1):16));
+    loBuf_J1 = str2num(databuffer(11:12));loBuf_J2 = str2num(databuffer(9:10));
+    loBuf_J3 = str2num(databuffer(7:8));loBuf_J4 = str2num(databuffer(5:6));
+    loBuf_J5 = str2num(databuffer(3:4));loBuf_J6 = str2num(databuffer(1:2));
+    data = [0,0,100,4*(loBuf_J6-50),4*(loBuf_J5-50),4*(loBuf_J4-50),4*(loBuf_J3-50),4*(loBuf_J2-50),4*(loBuf_J1-50),loBuf_Z,loBuf_Y,loBuf_X;0,0,0,0,0,0,0,0,0,0,0,0];
+    set(handles.uitable3,'data',data);   
+end
 end
 
 % --- Executes on button press in previewCamera.
@@ -139,10 +196,7 @@ hImage = image(zeros(640,480,3),'Parent',handles.axes1);
 hImage2 = image(zeros(1600,1200,3),'Parent',handles.axes2);
 preview(vid,hImage); 
 % preview(vid2,hImage2);
-% Hi, Arthur, i have an idea that I guess the camera might lose signal 
-% if the e-stop button is pressed.this function will popup an emergency 
-% warning.uncoment previewCamera then u see what'll happen.
-% 
+
 % [cdata,map] = imread('red-estop-Junior-s-Tees.jpg'); 
 %  h=msgbox('Check emergency button',...
 %         'Warning','custom',cdata,map);
@@ -176,26 +230,26 @@ function Ginput_Callback(hObject, eventdata, handles)
 % hObject    handle to Ginput (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-global vid;
+global vid; global commandFLag; 
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
 stoppreview(vid);
 [x,y] = ginput(1);
 %output xd,yd
-disp([x,y]);
-[xd,yd] = Pixel2Pose(x,y);
+% disp([x,y]);
+% [xd,yd] = Pixel2Pose(x,y);
+[xd,yd] = Pixel2Pose(500,400);
 preview(vid);
-data = get(handles.uitable3,'data');
 % Hint: get(hObject,'Value') returns toggle state of Up
-speed = uint64(data(5));
-xd = int32(xd); yd = int32(yd);
-disp([xd,yd])
-xd = uint64(negative2positive(xd)); yd = uint64(negative2positive(yd));
-disp([xd,yd])
-M = int2str(yd*10^10+xd*10^6+speed*100+3);
-
-M = format(M);
-
-disp(M);
-% MTRN4230_Client_Sample(M);
+xd = int16(xd); yd = int16(yd);
+% disp([xd,yd])
+% xd = uint64(xd); yd = uint64(yd);
+% disp([xd,yd])
+commandStr = ['5000' '5000' '5000' '5000' int2str(yd+5000) int2str(xd+5000) speed '06'];
+for s = 1:0.5:3
+    commandFLag.m = commandStr;
+    pause(0.2);
+end
 end
 
 
@@ -217,50 +271,33 @@ function EF_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of EF
 
 end
-% --- Executes on button press in JA.
-function JA_Callback(hObject, eventdata, handles)
-% hObject    handle to JA (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
 
-% Hint: get(hObject,'Value') returns toggle state of JA
 
-end
-% --- Executes on button press in CD.
-function CD_Callback(hObject, eventdata, handles)
-% hObject    handle to CD (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of CD
-stat = get(hObject,'Value');
-data = get(handles.uitable3,'data');
-if stat == 1
-    data(1,3) = ~data(1,3);
-    set(handles.uitable3,'data',data);
-else
-    data(1,3) = ~data(1,3);
-    set(handles.uitable3,'data',data);
-    
-end
-end
 % --- Executes on button press in VP.
 function VP_Callback(hObject, eventdata, handles)
 % hObject    handle to VP (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
 % Hint: get(hObject,'Value') returns toggle state of VP
-stat = get(hObject,'Value');
+% speed>1 comNO11 on comNO13 speed 
+% speed<1 comNO11 off
+% global commandFlag;
+% commandFlag.stat = get(hObject,'value');
+stat = get(hObject,'value');
 data = get(handles.uitable3,'data');
 if stat == 1
-    data(1,4) = ~data(1,4);
+    data(1,2) = ~data(1,2);
     set(handles.uitable3,'data',data);
+%     commandStr  = (['5000' '5000' '5000' '5000' '5000' '5000' '0005' '11']);
 else
-    data(1,4) = ~data(1,4);
+    data(1,2) = ~data(1,2);
     set(handles.uitable3,'data',data);
+%     commandStr = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '11']);
 end
+%     commandFlag.m = commandStr;
 end
+
+
 
 % --- Executes on button press in TrackChocolate.
 function TrackChocolate_Callback(hObject, eventdata, handles)
@@ -271,14 +308,10 @@ global vid;
 stat = get(hObject,'Value');
 stoppreview(vid);
 while stat == 1
-    image_choco = getsnapshot(vid);
-    chocolate1 = imrotate(image_choco,180);
-    [line1 line2] = part_two(chocolate1);
-%     Line1  = line1;
-%      line1 = line([0 10],[0 50],'color','r','LineWidth',10);
-    set(line1,'Parent',handles.axes1);
-%     p=stem(1:10);
-%     set(p,'Parent', handles.axes1);    
+% %      image_choco = getsnapshot(vid);
+%     image_choco = imread('IMG_0014.jpg');
+%     output = DetectChocolate3(image_choco);
+
 end
 
 preview(vid);
@@ -287,118 +320,6 @@ preview(vid);
 end
 
 %Chocolate image processing from PSE1-----------------------------------------------
-function [line1 line2] = part_two(image)
-% chocolate1 = imread('IMG_0014.jpg');
-% chocolate2 = imread('IMG_0017.jpg');
-% chocolate1 = imrotate(chocolate1,180);
-% chocolate2 = imrotate(chocolate2,180);
-
-%isolate bench
-image_ = isolate(image);
-% chocolate2_ = isolate(chocolate2);
-Chocolate = image_;%input Image
-
-[BWchoco1,maskedChoco1]  = createMask(Chocolate);
-BWchoco1 = bwareaopen(BWchoco1, 120);%clear noise on the picture
-CH = bwconvhull(BWchoco1); %create a convel hull
-% figure;imshow(BWchoco1);
-centroidChoco1 = regionprops(CH, 'Centroid');
-orientation = regionprops(CH,'Orientation');
-%get chocolate key points
-[p1 p2 p3 p4 p5 p6] = getGlobalPoints(orientation.Orientation,centroidChoco1.Centroid,[80 170]);
-p1 = int16(p1); p2 = int16(p2);p3 = int16(p3); p4 = int16(p4);p5 = int16(p5); p6 = int16(p6);
-BWregion1 = roipoly(BWchoco1,[p1(1),p2(1),p5(1),p6(1)],[p1(2),p2(2),p5(2),p6(2)]); 
-BWregion2 = roipoly(BWchoco1,[p3(1),p4(1),p5(1),p6(1)],[p3(2),p4(2),p5(2),p6(2)]); 
-%cut chocolate into 2 regions
-region1 = BWregion1.*(BWchoco1);
-region2 = BWregion2.*(BWchoco1);
-%figure out the heading
-if size(find(region1==1)) > size(find(region2==1))
-    heading = 1;
-else
-    heading = 2;
-end
-%choose right pointing line segments distance
-for increment = 0:1:200
-lineLength = sqrt((increment*tan(orientation.Orientation*pi/180))^2+(increment)^2);
-    if lineLength > 100
-    break
-    end
-end
-if heading == 1
-    line1 = line([centroidChoco1.Centroid(1) centroidChoco1.Centroid(1)+increment],[centroidChoco1.Centroid(2) centroidChoco1.Centroid(2)-increment*tan(orientation.Orientation*pi/180)],'color','r','LineWidth',4);
-else
-    line1 = line([centroidChoco1.Centroid(1) centroidChoco1.Centroid(1)-increment],[centroidChoco1.Centroid(2) centroidChoco1.Centroid(2)+increment*tan(orientation.Orientation*pi/180)],'color','r','LineWidth',4);
-end
-line2 = line([centroidChoco1.Centroid(1) centroidChoco1.Centroid(1)+100],[centroidChoco1.Centroid(2) centroidChoco1.Centroid(2)],'color','r','LineWidth',4);
-return;
-end
-
-
-
-
-function [BW,maskedRGBImage] = createMask(RGB)
-%createMask  Threshold RGB image using auto-generated code from colorThresholder app.
-%  [BW,MASKEDRGBIMAGE] = createMask(RGB) thresholds image RGB using
-%  auto-generated code from the colorThresholder App. The colorspace and
-%  minimum/maximum values for each channel of the colorspace were set in the
-%  App and result in a binary mask BW and a composite image maskedRGBImage,
-%  which shows the original RGB image values under the mask BW.
-
-% Auto-generated by colorThresholder app on 28-Mar-2015
-%------------------------------------------------------
-
-
-% Convert RGB image to chosen color space
-I = RGB;
-
-% Define thresholds for channel 1 based on histogram settings
-channel1Min = 0.000;
-channel1Max = 158.000;
-
-% Define thresholds for channel 2 based on histogram settings
-channel2Min = 0.000;
-channel2Max = 206.000;
-
-% Define thresholds for channel 3 based on histogram settings
-channel3Min = 57.000;
-channel3Max = 255.000;
-
-% Create mask based on chosen histogram thresholds
-BW = (I(:,:,1) >= channel1Min ) & (I(:,:,1) <= channel1Max) & ...
-    (I(:,:,2) >= channel2Min ) & (I(:,:,2) <= channel2Max) & ...
-    (I(:,:,3) >= channel3Min ) & (I(:,:,3) <= channel3Max);
-
-% Initialize output masked image based on input image.
-maskedRGBImage = RGB;
-
-% Set background pixels where BW is false to zero.
-maskedRGBImage(repmat(~BW,[1 1 3])) = 0;
-end
-
-function result = isolate(bench)
-    xx = [1 1600 1600 1]; yy = [963 963 1200 1200];
-    result = icolor(uint8(imcomplement(roipoly(bench,xx,yy)))).*bench;
-    return
-end
-
-function [point1Global,point2Global,point3Global,point4Global,point5Global,point6Global] = getGlobalPoints(orientation,centriod,objectDimension)
-    theta = (orientation)*pi/180;
-    L = objectDimension(2)/2; W = objectDimension(1)/2;
-    point1 = [L -W];
-    point2 = [L W];
-    point3 = [-L -W];
-    point4 = [-L W];
-    point5 = [0 W];
-    point6 = [0 -W];
-    point1Global = [centriod(1)-point1(1)*cos(theta)-sin(theta)*point1(2) centriod(2)+point1(1)*sin(theta)-cos(theta)*point1(2)];
-    point2Global = [centriod(1)-point2(1)*cos(theta)-sin(theta)*point2(2) centriod(2)+point2(1)*sin(theta)-cos(theta)*point2(2)];
-    point3Global = [centriod(1)-point3(1)*cos(theta)-sin(theta)*point3(2) centriod(2)+point3(1)*sin(theta)-cos(theta)*point3(2)];
-    point4Global = [centriod(1)-point4(1)*cos(theta)-sin(theta)*point4(2) centriod(2)+point4(1)*sin(theta)-cos(theta)*point4(2)];
-    point5Global = [centriod(1)-point5(1)*cos(theta)-sin(theta)*point5(2) centriod(2)+point5(1)*sin(theta)-cos(theta)*point5(2)];
-    point6Global = [centriod(1)-point6(1)*cos(theta)-sin(theta)*point6(2) centriod(2)+point6(1)*sin(theta)-cos(theta)*point6(2)];
-    return
-end
 
 
 % --- Executes on button press in Up.
@@ -406,28 +327,47 @@ function Up_Callback(hObject, eventdata, handles)
 % hObject    handle to Up (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-data = get(handles.uitable3,'data');
 % Hint: get(hObject,'Value') returns toggle state of Up
-speed = data(5);
+global commandFlag;global tableUpdate;
+commandFlag.stat = get(hObject,'Value');
 stat = get(hObject,'Value');
-speed_ = speed*100;
-% if (~get(handles.LT,'Value'))
-    
-M = 1000005+speed_; %0000.0000.0001.0000.05
-M = int2str(M);
-M = format(M);
-% disp(M);
-    while stat  
-        
-        drawnow
-        disp(M);
-        stat = get(hObject,'Value');
-        disp(stat);
-%     disp(stat);
-    %     MTRN4230_Client_Sample(M);
-
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
+    while stat
+        stat = get(hObject,'Value'); 
+        drawnow; 
+%         if ~stat, break; end
+        if ~get(handles.LT,'Value')
+%             drawnow;
+            buf = (['5000' '5000' '5200' speed '05']);
+        else
+%             drawnow;
+            %do torsion 
+            MoveJoint = str2double(get(handles.JointNo,'String'));
+            switch MoveJoint
+                case 1
+                    buf = (['5000' '5000' '5000' '5000' '5000' '5200' speed '07']);       
+                case 2
+                    buf = (['5000' '5000' '5000' '5000' '5200' '5000' speed '07']);
+                case 3
+                    buf = (['5000' '5000' '5000' '5200' '5000' '5000' speed '07']);
+                case 4
+                    buf = (['5000' '5000' '5200' '5000' '5000' '5000' speed '07']);
+                case 5
+                    buf = (['5000' '5200' '5000' '5000' '5000' '5000' speed '07']);
+                case 6
+                    buf = (['5200' '5000' '5000' '5000' '5000' '5000' speed '07']);
+            end                      
+        end
+            commandStr = format(buf,30);
+            commandFlag.m = commandStr; 
+            data = get(handles.uitable3,'data');
+            data(1,4:12) = tableUpdate;
+            set(handles.uitable3,'data',data);  
     end
-
+            buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00'];
+            commandStr = format(buf,30);
+            commandFlag.m = commandStr;  
 end
 
 % --- Executes on button press in Down.
@@ -437,28 +377,47 @@ function Down_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of Down
-data = get(handles.uitable3,'data');
 % Hint: get(hObject,'Value') returns toggle state of Up
-speed = data(5);
+global commandFlag; global tableUpdate;
+commandFlag.stat = get(hObject,'Value');
 stat = get(hObject,'Value');
-speed_ = speed*100;
-% if (~get(handles.LT,'Value'))
-    
-M = 2000005+speed_; %0000.0000.0001.0000.05
-M = int2str(M);
-M = format(M);
-disp(M);
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
     while stat   
-        drawnow;
-        disp(M);
-        stat = get(hObject,'Value');
-        disp(stat);
-        %     MTRN4230_Client_Sample(M);
-
+        stat = get(hObject,'Value'); 
+        drawnow; 
+%         if ~stat, break; end
+        if ~get(handles.LT,'Value')
+%             drawnow;
+            buf = (['5000' '5000' '4800' speed '05']);
+        else
+%             drawnow;
+            %do torsion 
+            MoveJoint = str2double(get(handles.JointNo,'String'));
+            switch MoveJoint
+                case 1
+                    buf = (['5000' '5000' '5000' '5000' '5000' '4800' speed '07']);       
+                case 2
+                    buf = (['5000' '5000' '5000' '5000' '4800' '5000' speed '07']);
+                case 3
+                    buf = (['5000' '5000' '5000' '4800' '5000' '5000' speed '07']);
+                case 4
+                    buf = (['5000' '5000' '4800' '5000' '5000' '5000' speed '07']);
+                case 5
+                    buf = (['5000' '4800' '5000' '5000' '5000' '5000' speed '07']);
+                case 6
+                    buf = (['4800' '5000' '5000' '5000' '5000' '5000' speed '07']);
+            end                      
+        end
+            commandStr = format(buf,30);
+            commandFlag.m = commandStr; 
+            data = get(handles.uitable3,'data');
+            data(1,4:12) = tableUpdate;
+            set(handles.uitable3,'data',data);   
     end
-% else
-%     %do torsion mode
-% end
+            buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00'];
+            commandStr = format(buf,30);
+            commandFlag.m = commandStr;  
 end
 
 % --- Executes on button press in Left.
@@ -466,27 +425,25 @@ function Left_Callback(hObject, eventdata, handles)
 % hObject    handle to Left (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
 % Hint: get(hObject,'Value') returns toggle state of Left
-data = get(handles.uitable3,'data');
 % Hint: get(hObject,'Value') returns toggle state of Up
-speed = data(5);
+global commandFlag;global tableUpdate;
+commandFlag.stat = get(hObject,'Value');
 stat = get(hObject,'Value');
-speed_ = speed*100;
-% if (~get(handles.LT,'Value'))
-    
-M = 10000000005+speed_; %0000.0000.0001.0000.05
-M = int2str(M);
-M = format(M);
-
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
+buf = (['5000' '5200' '5000' speed '05']);
+commandStr = format(buf,30); 
     while stat   
         drawnow;
-        disp(M);
-        stat = get(hObject,'Value');
-        disp(stat);
-    %     MTRN4230_Client_Sample(M);
-
+        commandFlag.m = commandStr;
+        data = get(handles.uitable3,'data');
+        data(1,4:12) = tableUpdate;
+        set(handles.uitable3,'data',data);
     end
+    buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00'];
+    commandStr = format(buf,30);
+    commandFlag.m = commandStr;  
 end
 
 % --- Executes on button press in Right.
@@ -494,27 +451,51 @@ function Right_Callback(hObject, eventdata, handles)
 % hObject    handle to Right (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
 % Hint: get(hObject,'Value') returns toggle state of Right
-data = get(handles.uitable3,'data');
 % Hint: get(hObject,'Value') returns toggle state of Up
-speed = data(5);
+global commandFlag;global tableUpdate;
+commandFlag.stat = get(hObject,'Value');
 stat = get(hObject,'Value');
-speed_ = speed*100;
-% if (~get(handles.LT,'Value'))
-    
-M = 20000000005+speed_; %0000.0000.0001.0000.05
-M = int2str(M);
-M = format(M);
-
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
+buf = (['5000' '4800' '5000' speed '05']);
+commandStr = format(buf,30); 
     while stat   
         drawnow;
-        disp(M);
-        stat = get(hObject,'Value');
-        disp(stat);
-    %     MTRN4230_Client_Sample(M);
-
+        commandFlag.m = commandStr;
+        data = get(handles.uitable3,'data');
+        data(1,4:12) = tableUpdate;
+        set(handles.uitable3,'data',data);
     end
+    buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00'];
+    commandStr = format(buf,30);
+    commandFlag.m = commandStr;  
+end
+
+% --- Executes on button press in Zdown.
+function Zdown_Callback(hObject, eventdata, handles)
+% hObject    handle to Zdown (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+% Hint: get(hObject,'Value') returns toggle state of Zdown
+% Hint: get(hObject,'Value') returns toggle state of Up
+global commandFlag; global tableUpdate;
+commandFlag.stat = get(hObject,'Value');
+stat = get(hObject,'Value');
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
+buf = (['5200' '5000' '5000' speed '05']);
+commandStr = format(buf,30); 
+    while stat   
+        drawnow;
+        commandFlag.m = commandStr;
+        data = get(handles.uitable3,'data');
+        data(1,4:12) = tableUpdate;
+        set(handles.uitable3,'data',data);
+    end
+    buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00'];
+    commandStr = format(buf,30);
+    commandFlag.m = commandStr;  
 end
 
 % --- Executes on button press in Zup.
@@ -522,70 +503,47 @@ function Zup_Callback(hObject, eventdata, handles)
 % hObject    handle to Zup (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
 % Hint: get(hObject,'Value') returns toggle state of Zup
-data = get(handles.uitable3,'data');
-% Hint: get(hObject,'Value') returns toggle state of Up
-speed = data(5);
+global commandFlag; global tableUpdate;
+commandFlag.stat = get(hObject,'Value');
 stat = get(hObject,'Value');
-speed_ = speed*100;
-M = 100000000000005+speed_; %0000.0000.0001.0000.05
-M = int2str(M);
-M = format(M);
-
-
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
+buf = (['4800' '5000' '5000' speed '05']);
+commandStr = format(buf,30); 
     while stat   
         drawnow;
-        disp(M);
-        stat = get(hObject,'Value');
-        disp(stat);
-    %     MTRN4230_Client_Sample(M);
-
+        commandFlag.m = commandStr;
+        data = get(handles.uitable3,'data');
+        data(1,4:12) = tableUpdate;
+        set(handles.uitable3,'data',data);
     end
-end
-% --- Executes on button press in Zdown.
-function Zdown_Callback(hObject, eventdata, handles)
-% hObject    handle to Zdown (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of Zdown
-data = get(handles.uitable3,'data');
-% Hint: get(hObject,'Value') returns toggle state of Up
-speed = data(5);
-stat = get(hObject,'Value');
-speed_ = speed*100; 
-M = 200000000000005+speed_; %0000.0000.0001.0000.05
-M = int2str(M);
-M = format(M);
-
-
-    while stat   
-        drawnow;
-        disp(M);
-        stat = get(hObject,'Value');
-        disp(stat);
-    %     MTRN4230_Client_Sample(M);
-
-    end
+    buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00'];
+    commandStr = format(buf,30);
+    commandFlag.m = commandStr; 
 end
 
-function replaceString = format(str)
-if length(str)<30
-    zeroString = mat2str(zeros(1,(30-length(str))));
-    
-    buffer = zeroString(2:length(zeroString)-1);
-    replaceString = regexprep(buffer,'[^\w'']','');
-    replaceString = strcat(replaceString,str);
+
+function replaceString = format(str,n)
+    if length(str)<n
+        zeroString = mat2str(zeros(1,(n-length(str))));
+        if length(zeroString) == 1
+            buffer = zeroString;
+        else
+            buffer = zeroString(2:length(zeroString)-1);
+        end
+        replaceString = regexprep(buffer,'[^\w'']','');
+        replaceString = strcat(replaceString,str);        
+    else
+        replaceString = str;
+    end
     return;
-end
-
 end
 
 function result = negative2positive(a)
     if a <0
         buffer = int2str(a);
-        disp(length(buffer));
+%         disp(length(buffer));
         result = str2num(strcat('9', buffer(2:end)));   
     elseif a>=0
         result = a;
@@ -620,9 +578,436 @@ end
 
 % --- Executes on button press in StopTimer.
 function StopTimer_Callback(hObject, eventdata, handles)
+global socket;
 % hObject    handle to StopTimer (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 stop(handles.t);
+fclose(socket);
 
+end
+
+
+
+function JointNo_Callback(hObject, eventdata, handles)
+% hObject    handle to JointNo (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of JointNo as text
+%        str2double(get(hObject,'String')) returns contents of JointNo as a double
+
+end
+% --- Executes during object creation, after setting all properties.
+function JointNo_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to JointNo (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+end
+
+
+
+
+% function DetectChocolate
+function output= DetectChocolate3(im)
+sceneImage = im;
+% imshow(sceneImage);
+sceneGray = rgb2gray(sceneImage);
+sceneGray2 = sceneGray;
+scenePoints = detectSURFFeatures(sceneGray,'MetricThreshold',75);
+[sceneFeatures, scenePoints] = extractFeatures(sceneGray, scenePoints);
+c1 = [];
+count3 = [];
+% image1 = imread(strcat(program_folder, 'chocolate smaples/front1.jpg'));
+
+
+chocPolygon = [1, 1;...                           % top-left
+        177, 1;...                 % top-right
+        177, 81;... % bottom-right)
+        1, 81;...                 % bottom-left
+        1, 1];                   % top-left again to close the poly
+n = 0;
+times = 1;
+count = 0;
+count2 = 1;
+figure(1);
+% imshow(sceneImage);
+hold on;
+% load('chocolateData/chocData.mat');
+% load(strcat(program_folder, 'chocolateData/chocData.mat'));
+while (times <= 600)
+    times = times+1;
+	count = count+1;
+
+if count == 32 ||count <= 0
+    count = 1;
+end
+    
+        choc = sprintf('%s%d.mat', 'chocolateData/chocData', count);
+%         choc = sprintf('%s%d.mat', 'chocData', count);    
+        load(choc);
+
+%     [chocFeatures, chocPoints] = extractFeatures(chocGray, chocPoints);
+%     
+%     [sceneFeatures, scenePoints] = extractFeatures(sceneGray, scenePoints);
+
+
+    chocPairs = matchFeatures(chocFeatures, sceneFeatures, 'MatchThreshold',3);
+
+    matchedChocPoints = chocPoints(chocPairs(:, 1), :);
+    matchedScenePoints = scenePoints(chocPairs(:, 2), :);
+
+    [tform, inlierChocPoints, inlierScenePoints, status] = ...
+        estimateGeometricTransform(matchedChocPoints, matchedScenePoints, 'affine');
+    
+    if status ~= 0
+        if count2 <= 50
+        count2 = count2 + 1;
+            continue;
+        else
+%            count = count+1;
+%            continue;
+            break;
+        end
+    end
+%     figure(6);
+%     showMatchedFeatures(chocGray, sceneGray, inlierChocPoints, ...
+%         inlierScenePoints, 'montage');
+%     title('Matched Points (Inliers Only)');
+
+
+
+    newChocPolygon = transformPointsForward(tform, chocPolygon);
+
+    N = size(sceneImage);
+    c = [newChocPolygon(1,1);newChocPolygon(2,1);newChocPolygon(3,1);newChocPolygon(4,1);newChocPolygon(5,1)];
+    r = [newChocPolygon(1,2);newChocPolygon(2,2);newChocPolygon(3,2);newChocPolygon(4,2);newChocPolygon(5,2)];
+    BW = roipoly(sceneGray2,c,r);
+            
+    bwWhite = find(BW~=0);
+    if numel(bwWhite) <= 13037 || numel(bwWhite) >= 15637 
+        if count2 <= 50
+            count2 = count2 + 1;
+            continue;
+        else
+%            count = count+1;
+%            continue;
+            break;
+        end
+    end
+    stat = regionprops(BW, 'Perimeter', 'Centroid', 'Orientation');
+                
+    
+%     m = matchedScenePoints.Count;
+
+        B = stat.Perimeter;
+        C = stat.Centroid;
+        ori = stat.Orientation;
+    if B >= 486 && B <= 546;
+        count3 = [count3, count];
+        ref = (newChocPolygon(1,1) + newChocPolygon(4,1))/2;
+%         ref(2) = mean(newChocPolygon(2,2), newChocPolygon(3,2));
+        if count<=20;
+            [Flavour, Angle, Reachable, Pickable] = detectDetails(BW, sceneImage, sceneGray2, C, ori, ref);
+%             disp(flavour); disp(C(1)); disp(C(2)); disp(Angle); disp(Reachable);
+            ForB = 1;
+%             c = [C(1), C(2), Angle, 177, 81, Flavour, ForB, Reachable, Pickable];
+        else
+            [Flavour, Angle, Reachable, Pickable] = detectDetailsBack(C, ori, ref);
+            ForB = 0;
+%             disp(flavour); disp(C); disp(Angle); disp(Reachable);
+%             c = [C(1), C(2), Angle, 177, 81, Flavour, ForB, Reachable, Pickable];
+        end
+        c2 = [1600 - C(1), C(2), Angle, 177, 81, Flavour, ForB, Reachable, Pickable];
+
+        n = n+1;
+        x2 = C(1) + 150 * cos(Angle);
+        y2 = C(2) - 150 * sin(Angle); 
+        x2 = x2 - 2 * (x2 -C(1));
+        y2 = y2 - 2 * (y2 - C(2));
+%         position = []
+%         
+%         plot(100,100,'*r',handles.axes1);
+%         
+%         plot([x2 1600-C(1)], [y2 C(2)], 'r');
+%         plot([C(1)-150, C(1)], [C(2) C(2)], 'r');
+%         plot(C(1), C(2),'r')
+%         centre_str = sprintf('%s\n%d\n%s\n[%d, %d]\n%s\n%d','n =',n ,'Center =', int32(C(1)), int32(C(2)), 'Orientation =', Angle);
+%         text(C(1),C(2), centre_str, 'Color','y',...
+%        'FontSize',7,'FontWeight','bold');    
+        count = count-3;
+        BW1 = uint8(BW);
+        Gray = BW1 .* sceneGray;
+        for i = 1:scenePoints.Count
+            x1 = int32(scenePoints.Location(i,1));
+            y1 = int32(scenePoints.Location(i,2));
+            if Gray(y1,x1)~=0
+                sceneFeatures(i,:) = 0;
+            end
+        end
+
+%         
+%         
+        for i = 1:N(1)
+            for j = 1:N(2)
+                if BW(i,j) == 1
+                    sceneGray2(i,j) = 0;                        
+                end   
+            end
+        end
+
+%         a = size(chocPairs);
+%         for i = 1:a(1)
+%             sceneFeatures(chocPairs(i,2),:) = 0;
+%         end
+        
+    else
+        if count2 <= 50
+            count2 = count2 + 1;
+            continue;
+        else
+%            count = count+1;
+%            continue;
+            break;
+        end
+
+    end
+    count2 = 0;
+%     count2 = 0;
+    
+%     stat = struct([]);
+end
+value = []
+positon = [c2(:,1), c2(:,2)];    
+for k = 1:numel(c2(:,1))
+    value(k) = sprintf('%s\n%d\n%s\n[%d, %d]\n%s\n%d','n =',k ,'Center =', int32(c2(:,1)), int32(c2(:,2)), 'Orientation =', Angle(k));
+end
+
+% figure;
+% imshow(sceneImage);
+% hold on;
+% for i = 1:n
+%     line(allChocPolygons(5*i-4:5*i, 1), allChocPolygons(5*i-4:5*i, 2), 'Color', 'y');
+% end
+% disp(count3);
+hold off;
+% disp(times);
+end
+
+function [flavour, Angle, Reachable, Pickable] = detectDetails(BW, sceneImage, sceneGray, C, ori, ref)
+    ori = ori*pi/180;
+    BW1 = uint8(BW);
+    Gray = BW1 .* sceneGray;
+    RGB = sceneImage;
+    s = size(sceneImage);
+    for i = 1:s(1)
+        for j = 1:s(2)
+            if Gray(i,j) == 0
+                BW1(i,j) = 0;
+            end
+        end
+    end
+    BW2 = icolor(BW1);
+    RGB = BW2.*RGB;
+    [x1, y1] = find(RGB(:,:,1)<=72 & RGB(:,:,1)>=3 & RGB(:,:,2)>=26 & RGB(:,:,2)<=120 & RGB(:,:,3)>=69 & RGB(:,:,3)<=133);%blue
+    if numel(x1) >= 50;
+        flavour = 1;
+    else
+        [x2, y2] = find(RGB(:,:,1)>=122 & RGB(:,:,1)<=161 & RGB(:,:,2)>=75 & RGB(:,:,2)<=126 & RGB(:,:,3)>=4 & RGB(:,:,3)<=60);%orange
+        if numel(x2) >= 10;
+            flavour = 3;                      
+        else
+            [x3, y3] = find(RGB(:,:,1)>=33 & RGB(:,:,1)<=85 & RGB(:,:,2)>=69 & RGB(:,:,2)<=117 & RGB(:,:,3)>=1 & RGB(:,:,3)<=34);%green
+            if numel(x3) >= 10;
+                flavour = 4;
+            else
+                [x4, y4] = find(RGB(:,:,1)~=0);
+                if numel(x4) >= 11520;
+                    flavour = 2;
+                else
+                        flavour = 0;
+                end
+            end
+        end
+    end
+    if ori >= 0
+        if ref >= C(1);
+            Angle = ori;
+        else
+            Angle = ori - pi;
+        end
+    else
+        if ref >= C(1);
+            Angle = ori;
+        else
+            Angle = ori + pi;
+        end
+    end
+%         if Angle <= 0
+%             Angle = Angle+pi;
+%         else
+%             Angle = pi - Angle;
+%         end
+    x = (C(1) - 794)/1580*1040;
+    y = (C(2) - 142)/570*373.6;
+    if sqrt(x^2+(y+175)^2)<=548.6
+        Reachable = 1;
+        Pickable = 1;
+
+    else
+        Reachable = 0;
+        Pickable = 0;
+    end
+end
+
+function [flavour, Angle, Reachable, Pickable] = detectDetailsBack(C, ori, ref)
+    ori = ori*pi/180;
+        flavour = 0;
+    if ori >= 0
+        if ref >= C(1);
+            Angle = ori;
+        else
+            Angle = ori - pi;
+        end
+    else
+        if ref >= C(1);
+            Angle = ori;
+        else
+            Angle = ori + pi;
+        end
+    end
+%         if Angle <= 0
+%             Angle = Angle+pi;
+%         else
+%             Angle = Angle -pi;
+%         end
+    x = (C(1) - 794)/1580*1040;
+    y = (C(2) - 142)/570*373.6;
+    if sqrt(x^2+(y+175)^2)<=548.6
+        Reachable = 1;
+        Pickable = 1;
+
+    else
+        Reachable = 0;
+        Pickable = 0;
+    end
+end
+
+
+
+
+
+% --- Executes when entered data in editable cell(s) in uitable3.
+function uitable3_CellEditCallback(hObject, eventdata, handles)
+% hObject    handle to uitable3 (see GCBO)
+% eventdata  structure with the following fields (see MATLAB.UI.CONTROL.TABLE)
+%	Indices: row and column indices of the cell(s) edited
+%	PreviousData: previous data for the cell(s) edited
+%	EditData: string(s) entered by the user
+%	NewData: EditData or its converted form set on the Data property. Empty if Data was not changed
+%	Error: error string when failed to convert EditData to appropriate value for Data
+% handles    structure with handles and user data (see GUIDATA)
+global commandFlag;
+tableData = get(hObject,'data');
+commandFlag.speed =tableData(1,3);  commandFlag.Vac = tableData(1,2); commandFlag.CD = tableData(1,3);
+end
+
+
+% --- Executes on button press in MT.
+function MT_Callback(hObject, eventdata, handles)
+% hObject    handle to MT (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of MT
+
+global commandFlag; global tableUpdate;
+tableData = get(handles.uitable3,'data');
+MoveInstruction = tableData(2,3:12);
+    speed = int2str(tableData(1,3));loBuf_X = int2str(MoveInstruction(10)++5000);
+    loBuf_Y = int2str(MoveInstruction(9)++5000);loBuf_Z = int2str(MoveInstruction(8)++5000);
+    loBuf_J1 = int2str(MoveInstruction(7)+5000);loBuf_J2 = int2str(MoveInstruction(6)+5000);
+    loBuf_J3 = int2str(MoveInstruction(5)+5000);loBuf_J4 = int2str(MoveInstruction(4)+5000);
+    loBuf_J5 = int2str(MoveInstruction(3)+5000);loBuf_J6 = int2str(MoveInstruction(2)+5000);    
+    modeStat = get(handles.LT,'Value');
+    commandFlag.stat = get(hObject,'Value');
+    stat = get(hObject,'Value');
+    speed = format(speed,4);
+    while stat
+        stat = get(hObject,'Value');
+        drawnow;
+        if ~modeStat
+            buf = (['5000' '5000' '5000' loBuf_Z loBuf_Y loBuf_X speed '03']);        
+        else
+            buf = ([loBuf_J6 loBuf_J5 loBuf_J4 loBuf_J3 loBuf_J2 loBuf_J1 speed '04']);
+        end
+        commandStr = format(buf,30);
+        commandFlag.m = commandStr;
+        data = get(handles.uitable3,'data');
+        data(1,4:12) = tableUpdate;
+        set(handles.uitable3,'data',data);  
+%         pause(0.2);
+% disp('MT');
+    end
+    buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00'];
+end 
+
+
+% --- Executes on button press in Ginput_C.
+function Ginput_C_Callback(hObject, eventdata, handles)
+% hObject    handle to Ginput_C (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global vid; global commandFLag; 
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
+stoppreview(vid);
+[x,y] = ginput(1);
+%output xd,yd
+% disp([x,y]);
+% [xd,yd] = Pixel2Pose(x,y);
+[xd,yd] = Pixel2Pose(500,400);
+preview(vid);
+% Hint: get(hObject,'Value') returns toggle state of Up
+xd = int16(xd); yd = int16(yd);
+% disp([xd,yd])
+% xd = uint64(xd); yd = uint64(yd);
+% disp([xd,yd])
+commandStr = ['5000' '5000' '5000' '5000' int2str(yd+5000) int2str(xd+5000) speed '06'];
+for s = 1:0.5:3
+    commandFLag.m = commandStr;
+    pause(0.2);
+end
+end
+
+
+% --- Executes on button press in CD.
+function CD_Callback(hObject, eventdata, handles)
+% hObject    handle to CD (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of CD
+% global commandFlag;
+data = get(handles.uitable3,'data');
+% commandFlag.stat = get(hObject,'value');
+stat = get(hObject,'value');
+if stat == 1
+    data(1,1) = ~data(1,1);
+    set(handles.uitable3,'data',data);
+%     commandStr  = (['5000' '5000' '5000' '5000' '5000' '5000' '0005' '13']);
+else
+    data(1,1) = ~data(1,1);
+    set(handles.uitable3,'data',data);
+%     commandStr = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '13']);
+end
+% for s = 1:0.5:5
+%     commandFlag.m = commandStr;
+% end
 end
