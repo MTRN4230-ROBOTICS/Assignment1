@@ -22,7 +22,7 @@ function varargout = MainGUI(varargin)
 
 % Edit the above text to modify the response to help MainGUI
 
-% Last Modified by GUIDE v2.5 20-Apr-2015 18:34:58
+% Last Modified by GUIDE v2.5 11-May-2015 15:59:09
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -245,11 +245,11 @@ xd = int16(xd); yd = int16(yd);
 % disp([xd,yd])
 % xd = uint64(xd); yd = uint64(yd);
 % disp([xd,yd])
-commandStr = ['5000' '5000' '5000' '5000' int2str(yd+5000) int2str(xd+5000) speed '06'];
-for s = 1:0.5:3
-    commandFLag.m = commandStr;
-    pause(0.2);
-end
+data(2,12:12) = [yd+5000, xd+5000];
+set(handles.uitable3,'data',data);
+
+
+
 end
 
 
@@ -1010,4 +1010,50 @@ end
 % for s = 1:0.5:5
 %     commandFlag.m = commandStr;
 % end
+end
+
+
+% --- Executes on button press in MOT.
+function MOT_Callback(hObject, eventdata, handles)
+% hObject    handle to MOT (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of MOT
+%    xxxx xxxx xxxx xxxx xp   yp  speed command#
+% 06: Move to a specified position defined by x and y, 10cm over the table surface
+%Eg. 5000 5000 5000 5000 5200 5300 0100 06 100mm/s
+
+global commandFlag; global tableUpdate;
+tableData = get(handles.uitable3,'data');%get table data
+MoveInstruction = tableData(2,3:12);% get move instruction
+    speed = int2str(tableData(1,3));loBuf_X = int2str(MoveInstruction(10)++5000);
+    loBuf_Y = int2str(MoveInstruction(9)++5000);loBuf_Z = int2str(MoveInstruction(8)++5000);
+    loBuf_J1 = int2str(MoveInstruction(7)+5000);loBuf_J2 = int2str(MoveInstruction(6)+5000);
+    loBuf_J3 = int2str(MoveInstruction(5)+5000);loBuf_J4 = int2str(MoveInstruction(4)+5000);
+    loBuf_J5 = int2str(MoveInstruction(3)+5000);loBuf_J6 = int2str(MoveInstruction(2)+5000);    
+    commandFlag.stat = get(hObject,'Value'); %set global button status
+    stat = get(hObject,'Value');%get local button status
+    speed = format(speed,4); %get speed
+    while stat
+        stat = get(hObject,'Value');
+        drawnow;
+%         if ~modeStat
+            buf = ([loBuf_Y loBuf_X speed '06']);        
+%         else
+%             buf = ([loBuf_J6 loBuf_J5 loBuf_J4 loBuf_J3 loBuf_J2 loBuf_J1 speed '04']);
+%         end
+
+% display table module------------------------
+        commandStr = format(buf,30);
+        commandFlag.m = commandStr;
+        data = get(handles.uitable3,'data');
+        data(1,4:12) = tableUpdate;
+        set(handles.uitable3,'data',data);  
+%--------------------------------------------
+        %         pause(0.2);
+% disp('MT');
+    end
+    buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00']; %clear local buffer
+
 end
