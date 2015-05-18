@@ -1033,3 +1033,4 @@ speed = format(int2str(data(1,3)),4);
         end
 
 end
+%%%%%%%%%%%%command for conveyor is completed and pls check it%%%%%%%%%%%%%%%%
