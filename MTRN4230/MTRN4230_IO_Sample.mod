@@ -1,5 +1,10 @@
 MODULE MTRN4230_IO_Sample
     
+        
+   ! author: Ziwei Guo, Zicong He 
+   ! late update: 20/04/2015
+   !
+   
     PROC MainIO()
         
         TurnVacOn;
@@ -9,7 +14,25 @@ MODULE MTRN4230_IO_Sample
         
         TurnVacOff;
         
-        TurnConOnSafely;
+        WaitTime 2;
+        
+        TurnVacSoleniodOn;
+        
+        WaitTime 2;
+        
+        TurnVacSoleniodOff;
+        
+        WaitTime 2;
+        
+        TurnConOn;
+        
+        WaitTime 2;
+        
+        ConveyorForward;
+        
+        WaitTime 2;
+        
+        ConveyorBackward;
         
         WaitTime 2;
         
@@ -17,6 +40,7 @@ MODULE MTRN4230_IO_Sample
         
     ENDPROC
     
+    !Turn on vacumn
     PROC TurnVacOn()
         
         ! Set VacRun on.
@@ -24,28 +48,49 @@ MODULE MTRN4230_IO_Sample
         
     ENDPROC
     
+    !Turn off vacumn
     PROC TurnVacOff()
         
         ! Set VacRun off.
         SetDO DO10_1, 0;
         
     ENDPROC
-    
-    PROC TurnConOnSafely()
+  
+    !Start to suck
+    PROC TurnVacSoleniodOn()
         
-        ! An example of how an IF statement is structured.
-        ! DI10_1 is 'ConStat', and will only be equal to 1 if the conveyor is on and ready to run.
-        ! If it is ready to run, we will run it, if not, we will set it off so that we can fix it.
-        IF DI10_1 = 1 THEN
-            SetDO DO10_3, 1;
-        ELSE
-            SetDO DO10_3, 0;
-        ENDIF
+        ! Set VacRun soleniod on.
+        SetDO DO10_2, 1;
         
     ENDPROC
     
+    !Stop sucking
+    PROC TurnVacSoleniodOff()
+        
+        ! Set VacRun on.
+        SetDO DO10_2, 0;
+        
+    ENDPROC   
+    
+    !Turn on conveyor
+    PROC TurnConOn()
+        SetDO DO10_3, 1;
+    ENDPROC
+    
+    !Turn off conveyor
     PROC TurnConOff()
         SetDO DO10_3, 0;
     ENDPROC
+   
+    !Set conveyor direction into 1
+    PROC ConveyorForward()
+        SetDO DO10_4, 1;
+    ENDPROC
+    
+    !Set conveyor direction into 0
+     PROC ConveyorBackward()
+        SetDO DO10_4, 0;
+    ENDPROC   
+ 
     
 ENDMODULE
