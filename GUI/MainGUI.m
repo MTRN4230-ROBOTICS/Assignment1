@@ -22,7 +22,7 @@ function varargout = MainGUI(varargin)
 
 % Edit the above text to modify the response to help MainGUI
 
-% Last Modified by GUIDE v2.5 11-May-2015 15:59:09
+% Last Modified by GUIDE v2.5 10-May-2015 18:17:03
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -59,20 +59,21 @@ handles.t= timer(...
     'Period', 0.06, ...                % Initial period is 1 sec.
     'TimerFcn', @timer_Callback); % Specify callback
 
-global robot_IP_address; global robot_port; global socket; global buffer;global commandFlag;
+global robot_IP_address; global robot_port; global socket; global buffer;
 robot_IP_address = '127.0.0.1';
 robot_port = 7027;
-socket = tcpip(robot_IP_address, robot_port);
+% socket = tcpip(robot_IP_address, robot_port);
 buffer = [];
-commandFlag.stat = 0;
 set(socket, 'ReadAsyncMode', 'continuous'); 
 % 
-if(~isequal(get(socket, 'Status'), 'open'))
-    fopen(socket); 
-end
+% fopen(socket); 
+
 % Update handles structure
 guidata(hObject, handles);
 start(handles.t);
+
+
+
 
 end
 
@@ -85,24 +86,15 @@ global robot_IP_address; global robot_port; global socket;global commandFlag; gl
 global databuffer;global tableUpdate;
     if isempty(buffer)
         buffer = '500050005000500050005000010000';
+        commandFlag.m = buffer;
     end
-
     %   Check if the connection is valid.
     if(~isequal(get(socket, 'Status'), 'open'))
-        warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
+%         warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
     else
     
         % Read a line from the socket. Note the line feed appended to the message in the RADID sample code.
-%         try
-            data = fgetl(socket); %disp(data);
-            if isempty(data)
-                data = '000000000000000000000000000099';
-                disp('nodata flow');
-            end
-            %         
-%catch 
-%             warning(['No data flow']);
-%         end
+        data = fgetl(socket); %disp(data);
         databuffer = data; lastBits = str2double(databuffer(29:30));
         dataNum = str2num(data);
 %         lastBits = rem(dataNum,100);    
@@ -125,7 +117,7 @@ global databuffer;global tableUpdate;
             else
                 command = buffer; 
             end
-                disp(command);fwrite(socket, command);  
+                fwrite(socket, command);  
                 
 
         else
@@ -146,7 +138,7 @@ global databuffer;global tableUpdate;
     end
     
     %     disp(tableUpdate);
-%         disp(commandFlag.m);
+        disp(commandFlag.m);
 % commandFlag.CD,commandFlag.Vac,commandFlag.speed,
 
 end
@@ -245,11 +237,11 @@ xd = int16(xd); yd = int16(yd);
 % disp([xd,yd])
 % xd = uint64(xd); yd = uint64(yd);
 % disp([xd,yd])
-data(2,12:12) = [yd+5000, xd+5000];
-set(handles.uitable3,'data',data);
-
-
-
+commandStr = ['5000' '5000' '5000' '5000' int2str(yd+5000) int2str(xd+5000) speed '06'];
+for s = 1:0.5:3
+    commandFLag.m = commandStr;
+    pause(0.2);
+end
 end
 
 
@@ -273,29 +265,6 @@ function EF_Callback(hObject, eventdata, handles)
 end
 
 
-% --- Executes on button press in VP.
-function VP_Callback(hObject, eventdata, handles)
-% hObject    handle to VP (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-% Hint: get(hObject,'Value') returns toggle state of VP
-% speed>1 comNO11 on comNO13 speed 
-% speed<1 comNO11 off
-% global commandFlag;
-% commandFlag.stat = get(hObject,'value');
-stat = get(hObject,'value');
-data = get(handles.uitable3,'data');
-if stat == 1
-    data(1,2) = ~data(1,2);
-    set(handles.uitable3,'data',data);
-%     commandStr  = (['5000' '5000' '5000' '5000' '5000' '5000' '0005' '11']);
-else
-    data(1,2) = ~data(1,2);
-    set(handles.uitable3,'data',data);
-%     commandStr = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '11']);
-end
-%     commandFlag.m = commandStr;
-end
 
 
 
@@ -583,7 +552,7 @@ global socket;
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 stop(handles.t);
-fclose(socket);
+% fclose(socket);
 
 end
 
@@ -995,65 +964,72 @@ function CD_Callback(hObject, eventdata, handles)
 
 % Hint: get(hObject,'Value') returns toggle state of CD
 % global commandFlag;
-data = get(handles.uitable3,'data');
+% data = get(handles.uitable3,'data');
 % commandFlag.stat = get(hObject,'value');
+% stat = get(hObject,'value');
+
+global commandFlag;global tableUpdate;
+commandFlag.stat = get(hObject,'Value');
 stat = get(hObject,'value');
-if stat == 1
-    data(1,1) = ~data(1,1);
-    set(handles.uitable3,'data',data);
-%     commandStr  = (['5000' '5000' '5000' '5000' '5000' '5000' '0005' '13']);
-else
-    data(1,1) = ~data(1,1);
-    set(handles.uitable3,'data',data);
-%     commandStr = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '13']);
-end
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
+
+        while stat
+            stat = get(hObject,'Value'); 
+            drawnow; 
+            
+        if ~get(handles.CD,'Value')
+            buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '14']);
+            data(1,1) = 0;
+            set(handles.uitable3,'data',data);
+        else
+            buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0001' '14']);
+            data(1,1) = 1;
+            set(handles.uitable3,'data',data);        
+        
+        end          
+            commandStr = format(buf,30);
+            commandFlag.m = commandStr; 
+
+            commandFlag.m = commandStr;
+        end
+
 % for s = 1:0.5:5
 %     commandFlag.m = commandStr;
 % end
 end
 
 
-% --- Executes on button press in MOT.
-function MOT_Callback(hObject, eventdata, handles)
-% hObject    handle to MOT (see GCBO)
+% --- Executes on button press in VP.
+function VP_Callback(hObject, eventdata, handles)
+% hObject    handle to VP (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hint: get(hObject,'Value') returns toggle state of MOT
-%    xxxx xxxx xxxx xxxx xp   yp  speed command#
-% 06: Move to a specified position defined by x and y, 10cm over the table surface
-%Eg. 5000 5000 5000 5000 5200 5300 0100 06 100mm/s
+% Hint: get(hObject,'Value') returns toggle state of VP
+global commandFlag;global tableUpdate;
+commandFlag.stat = get(hObject,'Value');
+stat = get(hObject,'value');
+data = get(handles.uitable3,'data');
+speed = format(int2str(data(1,3)),4);
+        while stat
+            stat = get(hObject,'Value'); 
+            drawnow; 
+            
+        if ~get(handles.VP,'Value')
+            buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '11']);
+            data(1,2) = 0;
+            set(handles.uitable3,'data',data);
+        else
+            buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0001' '11']);
+            data(1,2) = 1;
+            set(handles.uitable3,'data',data);        
+        
+        end          
+            commandStr = format(buf,30);
+            commandFlag.m = commandStr; 
 
-global commandFlag; global tableUpdate;
-tableData = get(handles.uitable3,'data');%get table data
-MoveInstruction = tableData(2,3:12);% get move instruction
-    speed = int2str(tableData(1,3));loBuf_X = int2str(MoveInstruction(10)++5000);
-    loBuf_Y = int2str(MoveInstruction(9)++5000);loBuf_Z = int2str(MoveInstruction(8)++5000);
-    loBuf_J1 = int2str(MoveInstruction(7)+5000);loBuf_J2 = int2str(MoveInstruction(6)+5000);
-    loBuf_J3 = int2str(MoveInstruction(5)+5000);loBuf_J4 = int2str(MoveInstruction(4)+5000);
-    loBuf_J5 = int2str(MoveInstruction(3)+5000);loBuf_J6 = int2str(MoveInstruction(2)+5000);    
-    commandFlag.stat = get(hObject,'Value'); %set global button status
-    stat = get(hObject,'Value');%get local button status
-    speed = format(speed,4); %get speed
-    while stat
-        stat = get(hObject,'Value');
-        drawnow;
-%         if ~modeStat
-            buf = ([loBuf_Y loBuf_X speed '06']);        
-%         else
-%             buf = ([loBuf_J6 loBuf_J5 loBuf_J4 loBuf_J3 loBuf_J2 loBuf_J1 speed '04']);
-%         end
-
-% display table module------------------------
-        commandStr = format(buf,30);
-        commandFlag.m = commandStr;
-        data = get(handles.uitable3,'data');
-        data(1,4:12) = tableUpdate;
-        set(handles.uitable3,'data',data);  
-%--------------------------------------------
-        %         pause(0.2);
-% disp('MT');
-    end
-    buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00']; %clear local buffer
+    commandFlag.m = commandStr;
+        end
 
 end
