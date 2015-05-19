@@ -92,8 +92,7 @@ global databuffer;global tableUpdate;
     if(~isequal(get(socket, 'Status'), 'open'))
 %         warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
     else
-
-
+    
         % Read a line from the socket. Note the line feed appended to the message in the RADID sample code.
         data = fgetl(socket); %disp(data);
         databuffer = data; lastBits = str2double(databuffer(29:30));
@@ -1077,7 +1076,7 @@ goal_VP=data(2,2);
 
 
 
-if  stat_VP==goal_VP&stat_pos==goal_pos&preset==0
+if  preset==0
     set(hObject,'BackgroundColor','g');
     set(hObject,'Value',1);
 end
