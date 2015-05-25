@@ -22,12 +22,9 @@ function varargout = MainGUI(varargin)
 
 % Edit the above text to modify the response to help MainGUI
 
-% Last Modified by GUIDE v2.5 24-May-2015 20:56:50
+% Last Modified by GUIDE v2.5 24-May-2015 18:04:17
 
 % Begin initialization code - DO NOT EDIT
-global indi;
-indi=0;
-
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
@@ -59,7 +56,7 @@ function MainGUI_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.output = hObject;
 handles.t= timer(...
     'ExecutionMode', 'fixedRate', ...   % Run timer repeatedly
-    'Period', 0.3, ...                % Initial period is 1 sec.
+    'Period', 0.5, ...                % Initial period is 1 sec.
     'TimerFcn', @timer_Callback); % Specify callback
 
 global robot_IP_address; global robot_port; global socket; global buffer;global commandFlag;
@@ -69,11 +66,14 @@ robot_port = 7027;
 socket = tcpip(robot_IP_address, robot_port);
 buffer = [];
 commandFlag.stat = 0;
-% global JointBuffer;
-% JointBuffer = [];
+
+
 set(socket, 'ReadAsyncMode', 'continuous'); 
-% if(~isequal(get(socket, 'Status'), 'open'))
-    fopen(socket); 
+% % if(~isequal(get(socket, 'Status'), 'open'))
+%---------------------------------------------
+%     fopen(socket); 
+%---------------------------------------------    
+    
 %     data = fgetl(socket);
 %     if isempty(data)
 %         disp('no data at first');
@@ -85,7 +85,12 @@ set(socket, 'ReadAsyncMode', 'continuous');
 
 guidata(hObject, handles);
 % pause(0.5);
+
+for ii = 1 : 50
+    fwrite(socket, '500050005000500050005000000111');
+end
 start(handles.t);
+
 
 
 end
@@ -96,7 +101,7 @@ end
 
 function timer_Callback(obj,event)
 global robot_IP_address; global robot_port; global socket;global commandFlag; global buffer;
-global databuffer;global tableUpdate; %global JointBuffer;
+global databuffer;global tableUpdate;
     if isempty(buffer)
         buffer = '500050005000500050005000010000';
         commandFlag.m = buffer;
@@ -104,7 +109,7 @@ global databuffer;global tableUpdate; %global JointBuffer;
 
     %   Check if the connection is valid.
     if(~isequal(get(socket, 'Status'), 'open'))
-        warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
+%         warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
     else
     
         % Read a line from the socket. Note the line feed appended to the message in the RADID sample code.
@@ -119,14 +124,6 @@ global databuffer;global tableUpdate; %global JointBuffer;
             warning(['No data flow']);
         end
         databuffer = data; lastBits = str2double(databuffer(29:30));
-%         J6 = double(str2num(databuffer(1:4))-5000)*0.1;
-%         J5 = double(str2num(databuffer(5:8))-5000)*0.1;
-%         J4 = double(str2num(databuffer(9:12))-5000)*0.1;
-%         J3 = double(str2num(databuffer(13:16))-5000)*0.1;
-%         J2 = double(str2num(databuffer(17:20))-5000)*0.1;
-%         J1 = double(str2num(databuffer(21:24))-5000)*0.1;
-%         JointBuffer = [J1 J2 J3 J4 J5 J6];
-%             disp(JointBuffer);
         dataNum = str2num(data);
 %         lastBits = rem(dataNum,100);    
 %         disp(lastBits);
@@ -332,12 +329,12 @@ commandFlag.stat = get(hObject,'Value');
 stat = get(hObject,'value');
 data = get(handles.uitable3,'data');
 speed = format(int2str(data(1,3)),4);
-
+% Vp is soleniod
         while stat
             stat = get(hObject,'Value'); 
             drawnow; 
             
-        if ~stat
+        if ~get(handles.VP,'Value')
             buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '11']);
             data(1,2) = 0;
             set(handles.uitable3,'data',data);
@@ -351,6 +348,9 @@ speed = format(int2str(data(1,3)),4);
             commandFlag.m = commandStr; 
 
             commandFlag.m = commandStr;
+%             disp('-------------------');
+%             disp(commandFlag.m);
+            
         end    
     
 end
@@ -654,8 +654,9 @@ global socket;
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 stop(handles.t);
+%----------------------
 fclose(socket);
-
+%----------------------
 end
 
 
@@ -1111,7 +1112,7 @@ speed = format(int2str(data(1,3)),4);
             stat = get(hObject,'Value'); 
             drawnow; 
             
-        if ~stat
+        if ~get(handles.CD,'Value')
             buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '14']);
             data(1,1) = 0;
             set(handles.uitable3,'data',data);
@@ -1125,8 +1126,13 @@ speed = format(int2str(data(1,3)),4);
             commandFlag.m = commandStr; 
 
             commandFlag.m = commandStr;
+            
+            disp('-------------------');
+            disp(commandFlag.m);
+            drawnow; 
         end
 
+       
 end
 
 
@@ -1204,7 +1210,6 @@ MoveInstruction = tableData(2,3:12);% get move instruction
         pose = data(1,11:12);
         target = MoveInstruction(9:10);
         if abs(pose(1) - target(1))+abs(pose(2)-target(2)) < 1
-            pause(0.1);
             break;            
         end
 %---------------------------------------------
@@ -1245,103 +1250,15 @@ stat = get(hObject,'Value');%get local button status
 %         while stat 
                 stat = get(hObject,'Value');
                 drawnow;
-                MOT_Callback(hObject, eventdata, handles);
-                
-                VP_on_Callback(handles.VP_on,eventdata,handles);%pump open
-                Indicator_Callback(handles.Indicator,eventdata, handles);       
-                %set table
-%                 MOT_Callback(hObject, eventdata, handles);
-
-                VP_off_Callback(handles.VP_off,eventdata,handles);%pump off                
-                Indicator_Callback(handles.Indicator,eventdata,handles);
+                MOT_Callback(hObject, eventdata, handles)                
 %         end
     end    
 end
 
 
-% --- Executes on button press in Indicator.
-function Indicator_Callback(hObject, eventdata, handles)
-% hObject    handle to Indicator (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of Indicator
-global indi;
-
-data=get(handles.uitable3,'data');
-
-stat_VP=data(1,2);
-pose_now=data(1,11:12);
-pose_set=data(2,11:12);
-
-% if stat_VP==1 & pose_now==pose_set
-if stat_VP==1 & abs(pose_now(1) - pose_set(1))+abs(pose_now(2) - pose_set(2)) < 1
-    indi=indi+1;
-    set(hObject,'String',indi);
-    set(hObject,'BackgroundColor','g');
-else
-    indi=indi;
-    set(hObject,'String',indi);
-    set(hObject,'BackgroundColor','r');
-end
 
 
-end
-
-
-% --- Executes on button press in VP_on.
-function VP_on_Callback(hObject, eventdata, handles)
-% hObject    handle to VP_on (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-global commandFlag;
-
-data=get(handles.uitable3,'data');
-data(2,2)=1;
-set(handles.uitable3,'data',data);
-
-const=50; %keep sending command for a const time
-
-
-buf='01'+'11';
-format(buf,30);
-data(1,2)=1; 
-for i=1:const
-commandFlag.m=buf; %send message
-end
-set(handles.uitable3,'data',data); 
-
-buf = '500050005000500050005000010000';
-commandStr = format(buf,30);
-commandFlag.m = commandStr;  
-    
-end
-
-% --- Executes on button press in VP_off.
-function VP_off_Callback(hObject, eventdata, handles)
-% hObject    handle to VP_off (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-global commandFlag;
-
-data=get(handles.uitable3,'data');
-data(2,2)=0;
-set(handles.uitable3,'data',data);
-
-const=50;
-
-
-buf='00'+'11';
-format(buf,30);
-data(1,2)=0;
-for i=1:const
-commandFlag.m=buf;
-end
-set(handles.uitable3,'data',data);
-
-buf = '500050005000500050005000010000';
-commandStr = format(buf,30);
-commandFlag.m = commandStr;  
-
-
-end
+% function OpenVaccumn()
+% 
+% 
+% end 
