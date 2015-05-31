@@ -22,9 +22,12 @@ function varargout = MainGUI(varargin)
 
 % Edit the above text to modify the response to help MainGUI
 
-% Last Modified by GUIDE v2.5 24-May-2015 18:04:17
+% Last Modified by GUIDE v2.5 30-May-2015 16:51:12
 
 % Begin initialization code - DO NOT EDIT
+global indi;
+indi=0;
+
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
@@ -60,20 +63,17 @@ handles.t= timer(...
     'TimerFcn', @timer_Callback); % Specify callback
 
 global robot_IP_address; global robot_port; global socket; global buffer;global commandFlag;
-% robot_IP_address = '192.168.2.1';
-robot_IP_address = '127.0.0.1';
+robot_IP_address = '192.168.2.1';
+% robot_IP_address = '127.0.0.1';
 robot_port = 7027;
 socket = tcpip(robot_IP_address, robot_port);
 buffer = [];
 commandFlag.stat = 0;
-
-
+% global JointBuffer;
+% JointBuffer = [];
 set(socket, 'ReadAsyncMode', 'continuous'); 
-% % if(~isequal(get(socket, 'Status'), 'open'))
-%---------------------------------------------
-%     fopen(socket); 
-%---------------------------------------------    
-    
+% if(~isequal(get(socket, 'Status'), 'open'))
+    fopen(socket); 
 %     data = fgetl(socket);
 %     if isempty(data)
 %         disp('no data at first');
@@ -85,12 +85,9 @@ set(socket, 'ReadAsyncMode', 'continuous');
 
 guidata(hObject, handles);
 % pause(0.5);
-
-for ii = 1 : 50
-    fwrite(socket, '500050005000500050005000000111');
-end
 start(handles.t);
 
+PE_Callback(hObject,eventdata,handles); % openning Pump Engine
 
 
 end
@@ -101,15 +98,14 @@ end
 
 function timer_Callback(obj,event)
 global robot_IP_address; global robot_port; global socket;global commandFlag; global buffer;
-global databuffer;global tableUpdate;
+global databuffer;global tableUpdate; lastBits = 0;%global JointBuffer;
     if isempty(buffer)
         buffer = '500050005000500050005000010000';
         commandFlag.m = buffer;
     end
-
     %   Check if the connection is valid.
     if(~isequal(get(socket, 'Status'), 'open'))
-%         warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
+        warning(['Could not open TCP connection to ', robot_IP_address, ' on port ', robot_port]);
     else
     
         % Read a line from the socket. Note the line feed appended to the message in the RADID sample code.
@@ -123,7 +119,20 @@ global databuffer;global tableUpdate;
         catch 
             warning(['No data flow']);
         end
-        databuffer = data; lastBits = str2double(databuffer(29:30));
+        try
+        databuffer = data;       
+        lastBits = str2double(databuffer(length(databuffer)-1:length(databuffer)));
+        catch
+            disp('lastBits error');
+        end
+%         J6 = double(str2num(databuffer(1:4))-5000)*0.1;
+%         J5 = double(str2num(databuffer(5:8))-5000)*0.1;
+%         J4 = double(str2num(databuffer(9:12))-5000)*0.1;
+%         J3 = double(str2num(databuffer(13:16))-5000)*0.1;
+%         J2 = double(str2num(databuffer(17:20))-5000)*0.1;
+%         J1 = double(str2num(databuffer(21:24))-5000)*0.1;
+%         JointBuffer = [J1 J2 J3 J4 J5 J6];
+%             disp(JointBuffer);
         dataNum = str2num(data);
 %         lastBits = rem(dataNum,100);    
 %         disp(lastBits);
@@ -160,10 +169,11 @@ global databuffer;global tableUpdate;
         loBuf_J1 = str2num(databuffer(11:12));loBuf_J2 = str2num(databuffer(9:10));
         loBuf_J3 = str2num(databuffer(7:8));loBuf_J4 = str2num(databuffer(5:6));
         loBuf_J5 = str2num(databuffer(3:4));loBuf_J6 = str2num(databuffer(1:2));
-        tableUpdate = [4*(loBuf_J6-50),4*(loBuf_J5-50),4*(loBuf_J4-50),4*(loBuf_J3-50),4*(loBuf_J2-50),4*(loBuf_J1-50),loBuf_Z-5000,loBuf_Y-5000,loBuf_X-5000];
+        tableUpdate = [5*(loBuf_J6-50),5*(loBuf_J5-50),5*(loBuf_J4-50),5*(loBuf_J3-50),5*(loBuf_J2-50),5*(loBuf_J1-50),loBuf_Z-5000,loBuf_Y-5000,loBuf_X-5000];
     else
         tableUpdate = [0,0,0,0,0,0,0,0,0,0,0,0;0,0,0,0,0,0,0,0,0,0,0,0];
     end
+
     
 %         disp(tableUpdate);
 %         disp(commandFlag.m);
@@ -199,7 +209,7 @@ if ~isempty(buffer)&&~isempty(databuffer)
     loBuf_J1 = str2num(databuffer(11:12));loBuf_J2 = str2num(databuffer(9:10));
     loBuf_J3 = str2num(databuffer(7:8));loBuf_J4 = str2num(databuffer(5:6));
     loBuf_J5 = str2num(databuffer(3:4));loBuf_J6 = str2num(databuffer(1:2));
-    data = [0,0,100,4*(loBuf_J6-50),4*(loBuf_J5-50),4*(loBuf_J4-50),4*(loBuf_J3-50),4*(loBuf_J2-50),4*(loBuf_J1-50),loBuf_Z,loBuf_Y,loBuf_X;0,0,0,0,0,0,0,0,0,0,0,0];
+    data = [0,0,100,5*(loBuf_J6-50),5*(loBuf_J5-50),5*(loBuf_J4-50),5*(loBuf_J3-50),5*(loBuf_J2-50),5*(loBuf_J1-50),loBuf_Z,loBuf_Y,loBuf_X;0,0,0,0,0,0,0,0,0,0,0,0];
     set(handles.uitable3,'data',data);   
 end
 end
@@ -275,9 +285,9 @@ disp([xd,yd])
 % end
 data(2,11:12) = [yd, xd];
 set(handles.uitable3,'data',data);
-toggleButton = get(handles.MOT,'value');
+% toggleButton = get(handles.MOT,'value');
 % if ~toggleButton
-%     MOT_Callback(hObject, eventdata, handles);
+    MOT_Callback(hObject, eventdata, handles);
 % end
 end
 
@@ -302,58 +312,7 @@ function EF_Callback(hObject, eventdata, handles)
 end
 
 
-% --- Executes on button press in VP.
-function VP_Callback(hObject, eventdata, handles)
-% hObject    handle to VP (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-% Hint: get(hObject,'Value') returns toggle state of VP
-% speed>1 comNO11 on comNO13 speed 
-% speed<1 comNO11 off
-% global commandFlag;
-% commandFlag.stat = get(hObject,'value');
-% stat = get(hObject,'value');
-% data = get(handles.uitable3,'data');
-% if stat == 1
-%     data(1,2) = ~data(1,2);
-%     set(handles.uitable3,'data',data);
-% %     commandStr  = (['5000' '5000' '5000' '5000' '5000' '5000' '0005' '11']);
-% else
-%     data(1,2) = ~data(1,2);
-%     set(handles.uitable3,'data',data);
-% %     commandStr = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '11']);
-% end
-% %     commandFlag.m = commandStr;
-global commandFlag;global tableUpdate;
-commandFlag.stat = get(hObject,'Value');
-stat = get(hObject,'value');
-data = get(handles.uitable3,'data');
-speed = format(int2str(data(1,3)),4);
-% Vp is soleniod
-        while stat
-            stat = get(hObject,'Value'); 
-            drawnow; 
-            
-        if ~get(handles.VP,'Value')
-            buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '11']);
-            data(1,2) = 0;
-            set(handles.uitable3,'data',data);
-        else
-            buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0001' '11']);
-            data(1,2) = 1;
-            set(handles.uitable3,'data',data);        
-        
-        end          
-            commandStr = format(buf,30);
-            commandFlag.m = commandStr; 
 
-            commandFlag.m = commandStr;
-%             disp('-------------------');
-%             disp(commandFlag.m);
-            
-        end    
-    
-end
 
 
 
@@ -363,17 +322,31 @@ function TrackChocolate_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 global vid;
-stat = get(hObject,'Value');
+% stat = get(hObject,'Value');
+img = getsnapshot(vid);
 % stoppreview(vid);
-img = 'b.tif';
+
+% img = 'b.tif';
 output = DetectChocolate(img);
+disp(output);
+[x,y] = Pixel2Pose(output(1,1),output(1,2));
+disp([x,y]);
 output = transpose([output(:,1:3),output(:,6:9)]);
+disp(output);
 data = get(handles.uitable6,'data');
 % data{:,1:length(output(1,:))} = output;
 
 for i = 1:length(output(1,:))
+    disp(output(1,i));
+    disp(output(2,i));
     [output(1,i),output(2,i)] = Pixel2Pose(output(1,i),output(2,i));
+    disp('=-------');
+    disp(output(1,i));
+    disp(output(2,i));
     for j = 1:length(output(:,1))
+        if j == 3
+            output(j,i) = output(j,i)*180/pi;
+        end        
         data{j,i} = int16(output(j,i));
     end
 end
@@ -654,9 +627,8 @@ global socket;
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 stop(handles.t);
-%----------------------
 fclose(socket);
-%----------------------
+
 end
 
 
@@ -694,7 +666,7 @@ end
 function c2 = DetectChocolate(img)
 % sceneImage = imread('training_set/IMG_099.jpg');
 % sceneImage = uint*(sceneImage);
-sceneImage = imread(img);
+sceneImage = img;
 % figure(1)
 % % imshow(sceneImage);
 % hold on;
@@ -1012,9 +984,10 @@ function MT_Callback(hObject, eventdata, handles)
 
 global commandFlag; global tableUpdate;
 tableData = get(handles.uitable3,'data');
-MoveInstruction = tableData(2,3:12);
-    speed = int2str(tableData(1,3));loBuf_X = int2str(MoveInstruction(10)++5000);
-    loBuf_Y = int2str(MoveInstruction(9)+5000);loBuf_Z = int2str(MoveInstruction(8)++5000);
+
+    MoveInstruction = tableData(2,3:12);
+    speed = int2str(tableData(1,3));loBuf_X = int2str(MoveInstruction(10)+5000);
+    loBuf_Y = int2str(MoveInstruction(9)+5000);loBuf_Z = int2str(MoveInstruction(8)+5000);
     loBuf_J1 = int2str(MoveInstruction(7)+5000);loBuf_J2 = int2str(MoveInstruction(6)+5000);
     loBuf_J3 = int2str(MoveInstruction(5)+5000);loBuf_J4 = int2str(MoveInstruction(4)+5000);
     loBuf_J5 = int2str(MoveInstruction(3)+5000);loBuf_J6 = int2str(MoveInstruction(2)+5000);    
@@ -1025,18 +998,46 @@ MoveInstruction = tableData(2,3:12);
     while stat
         stat = get(hObject,'Value');
         drawnow;
-        if ~modeStat
-            buf = (['5000' '5000' '5000' loBuf_Z loBuf_Y loBuf_X speed '03']);        
-        else
+        
+
+        
+%         if ~modeStat
+%             buf = (['5000' '5000' '5000' loBuf_Z loBuf_Y loBuf_X speed '03']);        
+%         else
             buf = ([loBuf_J6 loBuf_J5 loBuf_J4 loBuf_J3 loBuf_J2 loBuf_J1 speed '04']);
-        end
+%         end
+
         commandStr = format(buf,30);
         commandFlag.m = commandStr;
+        %-----------------------------------------
+        %update table module
         data = get(handles.uitable3,'data');
         data(1,4:12) = tableUpdate;
-        set(handles.uitable3,'data',data);  
-%         pause(0.2);
-% disp('MT');
+        set(handles.uitable3,'data',data);
+        %---------------------------------------
+
+        %break module for automation
+%         try
+%         target = [MoveInstruction(2) MoveInstruction(3) MoveInstruction(4) MoveInstruction(5) MoveInstruction(6) MoveInstruction(7)]; 
+%         catch
+%             disp('11');
+%         end
+%         try
+%             pose = data(1,4:9);
+%         catch
+%             disp('22');
+%         end
+% %         disp(sum(abs(target - pose)));
+%         try a = sum(abs(target - pose));
+%         catch
+%             disp('33');
+%         end
+%             if sum(abs(target - pose)) < 1
+%                 break
+%                 pause(0.5);
+%             end
+
+        
     end
     buf = ['5000' '5000' '5000' '5000' '5000' '5000' speed '00'];
 end 
@@ -1112,7 +1113,7 @@ speed = format(int2str(data(1,3)),4);
             stat = get(hObject,'Value'); 
             drawnow; 
             
-        if ~get(handles.CD,'Value')
+        if ~stat
             buf = (['5000' '5000' '5000' '5000' '5000' '5000' '0000' '14']);
             data(1,1) = 0;
             set(handles.uitable3,'data',data);
@@ -1126,13 +1127,8 @@ speed = format(int2str(data(1,3)),4);
             commandFlag.m = commandStr; 
 
             commandFlag.m = commandStr;
-            
-            disp('-------------------');
-            disp(commandFlag.m);
-            drawnow; 
         end
 
-       
 end
 
 
@@ -1197,10 +1193,9 @@ MoveInstruction = tableData(2,3:12);% get move instruction
 %         else
 %             buf = ([loBuf_J6 loBuf_J5 loBuf_J4 loBuf_J3 loBuf_J2 loBuf_J1 speed '04']);
 %         end
-
-% display table module------------------------
         commandStr = format(buf,30);
         commandFlag.m = commandStr;
+% display table module------------------------
         data = get(handles.uitable3,'data');
         data(1,4:12) = tableUpdate;
         set(handles.uitable3,'data',data);  
@@ -1210,6 +1205,7 @@ MoveInstruction = tableData(2,3:12);% get move instruction
         pose = data(1,11:12);
         target = MoveInstruction(9:10);
         if abs(pose(1) - target(1))+abs(pose(2)-target(2)) < 1
+            pause(0.5);
             break;            
         end
 %---------------------------------------------
@@ -1229,36 +1225,283 @@ function PC_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 % Hint: get(hObject,'Value') returns toggle state of PC
-global commandFlag;
+global commandFlag; global tableUpdate;
+
+% display table module------------------------
+        data = get(handles.uitable3,'data');
+        data(1,4:12) = tableUpdate;
+        set(handles.uitable3,'data',data);  
+%--------------------------------------------
+
 data1 = get(handles.uitable6,'data');
 data2 = get(handles.uitable3,'data');
+data2(2,:) = 0;
+set(handles.uitable3,'data',data2);
 %choco position from uitable6  x  x  x  x ...
 %                              y  y  y  y ...
 pickInstruction = [];
-pickInstruction = transpose(data1(1:2,1:length(data1(1,:)))); % transposed
+chocolateDataUsed = 3;
+pickInstruction = transpose(data1(1:chocolateDataUsed,1:length(data1(1,:)))); % transposed
 %remove empty cell
 emptyCells = cellfun(@isempty,pickInstruction);
 pickInstruction(emptyCells) = [];
 pickInstructionMatrix = cell2mat(pickInstruction);
-chocolateNumber = numel(pickInstruction)/2;
-pickInstructionMatrix = reshape(pickInstructionMatrix,chocolateNumber,2);
+chocolateNumber = numel(pickInstruction)/chocolateDataUsed;
+pickInstructionMatrix = reshape(pickInstructionMatrix,chocolateNumber,chocolateDataUsed);
 commandFlag.stat = get(hObject,'Value'); %set global button status
 stat = get(hObject,'Value');%get local button status
     for i = 1:chocolateNumber
-        data2(2,11:12) = pickInstructionMatrix(i,1:2);
+        data2(2,11) = pickInstructionMatrix(i,2); 
+        data2(2,12) = pickInstructionMatrix(i,1); 
         set(handles.uitable3,'data',data2);        
 %         while stat 
                 stat = get(hObject,'Value');
                 drawnow;
-                MOT_Callback(hObject, eventdata, handles)                
+                MOT_Callback(hObject, eventdata, handles);
+                %pump open
+                VPopen_Callback(hObject, eventdata, handles);
+                break;
+                % lift up the cho by 50mm high 
+                LU_Callback(hObject, eventdata, handles);
+                %
+                
+                % fit orientation;
+                MoveJ6_Callback(hObject, eventdata, handles);
+                
+                %----------------------------------------------
+%                 data2 = get(handles.uitable3,'data');%get new table value, important!!!
+                
+
+                get table = talbe 3
+                data3(2,10:12) = [z,y,x];%setting stack position
+                set(handles.uitable3,'data',data2);
+                call MT call back
+                %move up
+%                 data2 = get(handles.uitable3,'data');%get new table value, important!!!
+%                 data2(1,10) = data2(1,10)+100;
+%                 set(handles.uitable3,'data',data2);       
+%                 MT_Callback(hObject, eventdata, handles);
+%                 
+                %set table to fix chocolate orientation
+                
+%                 data2 = get(handles.uitable3,'data');%get new table value, important!!!
+%                 data2(2,4:9) = data2(1,4:9);
+%                 data2(2,4) = pickInstructionMatrix(i,3);                  
+%                 set(handles.uitable3,'data',data2);       
+%                 
+%                 % fix chocolate orientation
+%                 set(handles.LT,'value',1);
+% %                 stop(handles.t);
+% %                 start(handles.t);
+%                 MT_Callback(hObject, eventdata, handles);
+%                 set(handles.LT,'value',0);
+%                 break;
+                %set stack position
+                %release chocolate
+%                 VPclose_Callback(hObject, eventdata, handles)
+                %-------------------------------
+                
+%                 Indicator_Callback(handles.Indicator,eventdata, handles);
+                
+                
+                %set table
+%                 MOT_Callback(hObject, eventdata, handles);
+                %pump off                
+%                 Indicator_Callback(handles.Indicator,eventdata,handles);
 %         end
+
     end    
 end
 
+function LP_Callback(hObject, eventdata, handles)
+global commandFlag; global tableUpdate;
+tableData = get(handles.uitable3,'data');%get table data
+MoveInstruction = tableData(2,3:12);% get move instruction
+speed = int2str(tableData(1,3));
+speed = format(speed,4); %get speed
+
+init_poseZ = tableUpdate(1,7);
+% Lift up high by 50
+target = init_poseZ + 50;
+
+while 1  
+    
+    buf = ['5000' '5000' '5000' '5000' '5000' '5050' speed '01'];
+    commandStr = format(buf,30);
+    commandFlag.m = commandStr; 
+    current_poseZ = tableUpdate(1,7);
+    
+    if abs(target(1) - current_poseZ(1)) < 1
+        pause(0.5);
+        break;            
+    end
+end   
+  
+end 
 
 
 
-% function OpenVaccumn()
-% 
-% 
-% end 
+function MoveJ6_Callback(hObject, eventdata, handles)
+% hObject    handle to Indicator (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global commandFlag; global tableUpdate;
+tableData = get(handles.uitable3,'data');%get table data
+MoveInstruction = tableData(2,3:12);% get move instruction
+speed = int2str(tableData(1,3));
+speed = format(speed,4); %get speed
+
+ini_poseJ6 = tableUpdate(1,1); 	% dynamic data
+ori = tableData(2,4); %simulate it as 5480
+targetOri = ini_poseJ6-ori;    % design 5000 - 100(degree) = 4900(reversed 100 degree)
+fixOri_str = num2str(5000-ori);
+while 1 
+    
+    buf = [ fixOri_str '5000' '5000' '5000' '5000' '5000' speed '02'];
+    commandStr = format(buf,30);
+    commandFlag.m = commandStr;
+    current_poseJ6 = tableUpdate(1,1);
+    
+    if abs(targetOri(1) - current_poseJ6(1)) < 1
+        pause(0.5);
+        break;            
+    end
+    
+end 
+
+
+end 
+
+
+
+% --- Executes on button press in Indicator.
+function Indicator_Callback(hObject, eventdata, handles)
+% hObject    handle to Indicator (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of Indicator
+global indi;
+
+data=get(handles.uitable3,'data');
+
+stat_VP=data(1,2);
+pose_now=data(1,11:12);
+pose_set=data(2,11:12);
+
+% if stat_VP==1 & pose_now==pose_set
+if abs(pose_now(1) - pose_set(1))+abs(pose_now(2) - pose_set(2)) < 1
+    indi=indi+1;
+    set(hObject,'String',indi);
+    set(hObject,'BackgroundColor','g');
+else
+    indi=indi;
+    set(hObject,'String',indi);
+    set(hObject,'BackgroundColor','r');
+end
+
+
+end
+
+
+% --- Executes on button press in VPopen.
+function VPopen_Callback(hObject, eventdata, handles)
+% hObject    handle to VPopen (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global commandFlag;
+
+data=get(handles.uitable3,'data');
+
+
+const=15; %keep sending command for a const time
+
+
+buf=(['01' '11']);
+buf = format(buf,30);
+data(1,2)=1; 
+for i=1:const
+commandFlag.m=buf; %send message
+pause(0.1);
+disp(buf);
+end
+set(handles.uitable3,'data',data); 
+
+buf = '500050005000500050005000010000';
+commandStr = format(buf,30);
+commandFlag.m = commandStr;  
+end
+
+% --- Executes on button press in VPclose.
+function VPclose_Callback(hObject, eventdata, handles)
+% hObject    handle to VPclose (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+global commandFlag;
+
+data=get(handles.uitable3,'data');
+
+
+const=30; %keep sending command for a const time
+
+
+buf=(['00' '11']);
+buf = format(buf,30);
+data(1,2)=0; 
+for i=1:const
+commandFlag.m=buf; %send message
+pause(0.1);
+disp(buf);
+end
+set(handles.uitable3,'data',data); 
+
+buf = '500050005000500050005000010000';
+commandStr = format(buf,30);
+commandFlag.m = commandStr;   
+end
+
+
+% --- Executes on button press in PE.
+function PE_Callback(hObject, eventdata, handles)
+% hObject    handle to PE (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+global commandFlag;
+
+const=30;
+
+buf=(['01','12']); % open Pump Engine
+buf= format(buf,30);
+
+for i=1:const
+    commandFlag.m=buf;
+    pause(0.1);
+    disp(buf);
+end
+buf='500050005000500050005000010000';
+commandStr=format(buf,30);
+commandFlag.m=commandStr;
+set(handles.PE,'BackgroundColor','g');
+end
+
+function close_PE(handles) %if u need to close the pump
+global commandFlag;
+
+const=30;
+
+buf=(['00','12']); %close Pump Engine
+buf=format(buf,30);
+
+for i=1:const
+    commandFlag.m=buf;
+    pause(0.1);
+    disp(buf);
+end
+buf='500050005000500050005000010000';
+commandStr=fomat(buf,30);
+commandFlag.m=commandStr;
+set(handles.PE,'BacgroundColor','r');
+
+end
+ 
